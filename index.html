@@ -173,10 +173,39 @@
             const preview = document.getElementById('imagePreview');
             const file = event.target.files[0];
             if (file) {
+                // ضغط الصورة
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    preview.src = e.target.result;
-                    preview.classList.add('active');
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width;
+                        let height = img.height;
+                        
+                        // تصغير الحجم إذا كان كبير
+                        const maxSize = 1200;
+                        if (width > height && width > maxSize) {
+                            height = (height * maxSize) / width;
+                            width = maxSize;
+                        } else if (height > maxSize) {
+                            width = (width * maxSize) / height;
+                            height = maxSize;
+                        }
+                        
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        // ضغط بجودة 0.7
+                        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                        preview.src = compressedDataUrl;
+                        preview.classList.add('active');
+                        
+                        // حفظ الصورة المضغوطة
+                        preview.dataset.compressed = compressedDataUrl;
+                    };
+                    img.src = e.target.result;
                 };
                 reader.readAsDataURL(file);
             }
@@ -203,12 +232,43 @@
             };
 
             if (imageFile) {
-                const reader = new FileReader();
-                reader.onload = async (e) => {
-                    articleData.image = e.target.result;
+                const preview = document.getElementById('imagePreview');
+                const compressedImage = preview.dataset.compressed;
+                
+                if (compressedImage) {
+                    articleData.image = compressedImage;
                     await saveArticle(articleData, editId);
-                };
-                reader.readAsDataURL(imageFile);
+                } else {
+                    const reader = new FileReader();
+                    reader.onload = async (e) => {
+                        // ضغط الصورة
+                        const img = new Image();
+                        img.onload = async () => {
+                            const canvas = document.createElement('canvas');
+                            let width = img.width;
+                            let height = img.height;
+                            
+                            const maxSize = 1200;
+                            if (width > height && width > maxSize) {
+                                height = (height * maxSize) / width;
+                                width = maxSize;
+                            } else if (height > maxSize) {
+                                width = (width * maxSize) / height;
+                                height = maxSize;
+                            }
+                            
+                            canvas.width = width;
+                            canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, width, height);
+                            
+                            articleData.image = canvas.toDataURL('image/jpeg', 0.7);
+                            await saveArticle(articleData, editId);
+                        };
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(imageFile);
+                }
             } else {
                 if (editId) {
                     const articles = await getDocs(collection(db, 'articles'));
